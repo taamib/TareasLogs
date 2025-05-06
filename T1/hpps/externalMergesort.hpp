@@ -14,8 +14,6 @@ public:
 private:
     // Función auxiliar para mezclar runs (implementar recursión)
     static void merge_runs(FILE* input, FILE* output, size_t left, size_t right, size_t B, size_t M, int& disk_access);
-
-
 };
 
 #endif
