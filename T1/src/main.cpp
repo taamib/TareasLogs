@@ -1,7 +1,6 @@
 #include "../hpps/experiment.hpp"
-#include <vector>
-
 #include "../hpps/externalMergesort.hpp"
+#include <vector>
 
 int main() {
     const size_t B = 4096;  // Tamaño de bloque (ajustar según sistema)
