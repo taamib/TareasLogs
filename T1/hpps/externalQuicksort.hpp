@@ -1,6 +1,8 @@
 #ifndef EXTERNAL_QUICKSORT_HPP
 #define EXTERNAL_QUICKSORT_HPP
 
+typedef unsigned long long uint64_t;
+
 #include <cstdio>
 
 class ExternalQuickSort {
