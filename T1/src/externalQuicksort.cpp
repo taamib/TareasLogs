@@ -45,18 +45,55 @@ void ExternalQuickSort::sort(FILE* input, FILE* output, size_t B, size_t M, int 
     }
     
     // Caso recursivo (el archivo no cabe en memoria)
-    // De no caber en memoria, el archivo debe ser particionado para hacer la recursión con las particiones
+    // De no caber en memoria, el archivo debe ser particionado para hacer la recursión con los a subarreglos
 
     FILE* temp_part = tmpfile(); // Primero creamos un archivo temporal para hacer la particion
+
     partition(input,temp_part,0, n_elements - 1, B, a, disk_access); // Realizamos la particion y la guardamos en temp_part
 
-    fseek(temp_part,0,SEEK_SET); //fijamos el cursor de temp_part al inicio
-    disk_access++; //contamos un I/O por esta operación
+    fseek(temp_part,0,SEEK_SET); // Fijamos el cursor de temp_part al inicio
+    disk_access++; // Contamos un I/O por esta operación
+
+    for (int i = 0; i < a; i++){ // Para cada partición, hacemos lo siguiente
+        size_t p_size; // Consultamos el tamaño de la partición
+        fread(&p_size, sizeof(size_t), 1, temp_part); // Para esto, accedemos al dato siguiente al índice en el archivo particionado
+        disk_access++; // Contabilizamos el I/O
+
+        if (p_size > 0){ // Si el arreglo i tiene elementos, hacemos lo siguiente
+            
+            FILE* p_file = tmpfile(); // Creamos un archivo temporal para la partición
+
+            uint64_t* p_buff = new uint64_t[B / sizeof(uint64_t)]; // Creamos un buffer para copiar los datos de la partición en el archivo temporal
+            size_t p_remaining = p_size; // Contabilizamos cuantos elementos faltan por ser leidos, inicialmente todos lo de la partición
+
+            while (p_remaining > 0){ // Mientras nos queden elementos por leer, hacemos lo siguiente
+                size_t to_read = std::min(B / sizeof(uint64_t), p_remaining); // Elementos que vamos a leer con el buffer, puede variar en el ultimo tramo
+                fread(p_buff, sizeof(uint64_t), to_read, temp_part); // Leemos la cantidad correspondiente de elementos en el buffer desde el archivo particionado
+                fwrite(p_buff,sizeof(uint64_t),to_read,p_file); // Escribimos dichos archivos desde el buffer al archivo temporal creado
+                disk_access += 2; // Contabilizamos los I/Os
+                p_remaining -= to_read; // Indicamos que la cantidad de elementos que faltan por leer de la partición se redujo
+            }
+
+            delete[] p_buff; // Cuando leemos todos los elementos de la partición, liberamos el buffer
+            
+            fseek(p_file,0,SEEK_SET); // Colocamos el cursor del archivo temporal al principio
+
+            sort(p_file, output, B, M, a, disk_access); // Llamamos recursivamente a sort para ordenar la partición
+
+            fclose(p_file); // Podemos liberar el archivo temporal de la partición
+        }
+    }
+
+    fclose(temp_part); // Al terminar la recursión, podemos liberar el archivo en donde hicimos la partición
 }
 
 
 /**
- * partition nos entrega un archivo output particionado en a subarreglos a partir de un archivo input
+ * 'partition' nos entrega un archivo output particionado en a subarreglos a partir de un archivo input
+ * El output entregado tiene, para cada particion y de forma consecutiva:
+ * - El índice de la partición 'i'
+ * - El tamaño de la partición 'size'
+ * - Los elementos de la partición en los siguientes 'size' espacios
  * Usamos los mismos parámetros que en sort, pero agregamos
  * -low: índice inicial del subarreglo a particionar
  * -high: índice final del subarreglo a particionar
@@ -151,6 +188,4 @@ void ExternalQuickSort::partition(FILE* input, FILE* output, size_t low, size_t 
    // Con este proceso ya tenemos lo que qeriamos, por lo que podemos eliminar los buffer de los pivotes y de los archivos temporales
    delete[] pvts;
    delete[] tmp_files;
-
-   
 }   
