@@ -102,7 +102,7 @@ void ExternalQuickSort::partition(FILE* input, FILE* output, size_t low, size_t 
     
     // Primero, hacemos la selección de pivotes
     uint64_t* pvts = new uint64_t[a-1]; // Creamos un arreglo que contendrá los a-1 pivotes, los cuales arrojarán a subarreglos
-    select_pivots(input,pvts,a,B); // Seleccionamos los pivotes y los colocamos en el arreglo
+    select_pivots(input,pvts,a,B,disk_access); // Seleccionamos los pivotes y los colocamos en el arreglo
     disk_access++; // Contamos 1 I/O por hacer la selección
     std::sort(pvts, pvts + a - 1); // Ordenamos el arreglo de pivotes
 
@@ -189,3 +189,41 @@ void ExternalQuickSort::partition(FILE* input, FILE* output, size_t low, size_t 
    delete[] pvts;
    delete[] tmp_files;
 }   
+
+
+
+void ExternalQuickSort::select_pivots(FILE* file, uint64_t* pivots, int a, size_t B, int& disk_access){
+    
+    // Obtenemos el tamaño total del archivo
+    fseek(file,0,SEEK_END); // Movemos el cursor de file hasta el final
+    size_t f_size = ftell(file); // Consultamos por la posición del cursor, que en este caso coincidirá con el tamaño del archivo
+    fseek(file,0,SEEK_SET); // Devolvemos el cursor al inicio
+    disk_access += 2; // Contabilizamos ambos I/Os (uno por seek)
+
+
+    size_t t_blocks = f_size / B; // Calculamos cuántos bloques hay en el archivo
+
+
+    size_t r_block = rand() % t_blocks; // Seleccionamos un bloque aleatorio
+
+
+    uint64_t* block_buff = new uint64_t[B / sizeof(uint64_t)]; // Creamos un buffer para el bloque seleccionado
+
+
+    fseek(file, r_block*B, SEEK_SET); // Colocamos el cursor al inicio del bloque elegido
+    fread(block_buff, 1, B, file); // Leemos los B bytes del bloque
+    disk_access += 2; // contabilizamos ambos I/Os
+
+
+    size_t b_elements = B / sizeof(uint64_t); // Obtenemos el número de elementos del bloque
+    
+    for (int i = 0; i < a - 1; i++){ // Para cada posición del arreglo pivots:
+        size_t r_pos = rand() % b_elements; // Escogemos un elemento al azar del bloque elegido
+        pivots[i] = block_buff[r_pos]; // Lo buscamos en el buffer y lo agregamos como pivote a la lista
+    }
+
+    delete[] block_buff; // Cuando ya agregamos todos los pivotes necesarios, podemos liberar el buffer del bloque
+
+
+}
+
