@@ -2,6 +2,7 @@
 #define EXTERNAL_QUICKSORT_HPP
 
 #include <cstdio>
+#include <cstdint>
 
 class ExternalQuickSort {
 public:
