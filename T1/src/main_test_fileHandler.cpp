@@ -1,7 +1,7 @@
-#include "../src/fileHandler.cpp"
+#include "../hpps/fileHandler.hpp"
 #include <cstdio>
 #include <iostream>
-#include <random>
+#include <random>g++ src/main.cpp src/fileHandler.cpp src/externalMergesort.cpp -Ihpps -o mergesort
 #include <cstdint>
 #include <cstring>
 

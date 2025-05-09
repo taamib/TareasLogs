@@ -1,128 +1,181 @@
 #include "../hpps/externalMergesort.hpp"
-#include "fileHandler.cpp"
-#include <algorithm>  
-#include <cstdint>    
-#include <stdexcept>  
-#include <vector>
-#include <string>
-#include <cstdio>
-
-const size_t M = 50 * 1024 * 1024; // TamAño de M que se indica que debe ser 50MB
-const size_t B = 4096; // Tamaño de un bloque en disco que es 4Kb
-const size_t ELEMENTS_PER_BLOCK = B / sizeof(uint64_t); // Cuántos elementos de 8 bytes caben en un bloque
-#include "../hpps/externalMergesort.hpp"
-#include "fileHandler.cpp"
+#include "../hpps/fileHandler.hpp"
 #include <algorithm>
 #include <cstdint>
-#include <stdexcept>
 #include <vector>
+#include <stdexcept>
 #include <string>
 #include <cstdio>
 #include <queue>
 
-const size_t M = 50 * 1024 * 1024; // 50MB
-const size_t B = 4096; // 4KB
+const size_t M = 50 * 1024 * 1024;
+const size_t B = 4096;
 const size_t ELEMENTS_PER_BLOCK = B / sizeof(uint64_t);
+const int aridad = 2;
 
-ExternalMergeSort::ExternalMergeSort(size_t a) : aridad(a) {}
-
-void ExternalMergeSort::mergesort_externo(const std::string& input_path, const std::string& output_path, size_t N) {
-    if (N * sizeof(uint64_t) <= M) {
-        // Caso base: ordeno en RAM
-        std::vector<uint64_t> buffer(N);
-        FILE* in = fopen(input_path.c_str(), "rb");
-        fread(buffer.data(), sizeof(uint64_t), N, in);
-        fclose(in);
-
-        std::sort(buffer.begin(), buffer.end());
-
-        FILE* out = fopen(output_path.c_str(), "wb");
-        fwrite(buffer.data(), sizeof(uint64_t), N, out);
-        fclose(out);
-        return;
-    }
-
-    // Paso 1: dividir en 'a' subarreglos
-    size_t sub_N = (N + aridad - 1) / aridad; // ceil(N / a)
-    std::vector<std::string> sub_paths;
-
+std::vector<std::string> ExternalMergeSort::dividir_arr(const std::string& input_path, size_t N, int& disk_access) {
+    std::vector<std::string> partes;
     FILE* input = fopen(input_path.c_str(), "rb");
-    if (!input) throw std::runtime_error("No se pudo abrir archivo para dividir");
+    if (!input) throw std::runtime_error("No se pudo abrir el archivo original");
 
-    for (size_t i = 0; i < aridad && i * sub_N < N; ++i) {
-        std::string part_name = input_path + "_part" + std::to_string(i);
-        FILE* out = fopen(part_name.c_str(), "wb");
-        if (!out) throw std::runtime_error("No se pudo crear subarchivo");
+    size_t sub_N = (N + aridad - 1) / aridad;
+    size_t restantes = N;
+    std::vector<uint8_t> block(B);
+    std::vector<uint64_t> buffer(ELEMENTS_PER_BLOCK);
 
-        size_t cantidad = std::min(sub_N, N - i * sub_N);
-        for (size_t j = 0; j < cantidad; ++j) {
-            uint64_t x;
-            fread(&x, sizeof(uint64_t), 1, input);
-            fwrite(&x, sizeof(uint64_t), 1, out);
+    for (int i = 0; i < aridad && restantes > 0; i++) {
+        std::string nombre = input_path + "_part" + std::to_string(i);
+        FILE* out = fopen(nombre.c_str(), "wb");
+        if (!out) throw std::runtime_error("No se pudo crear archivo temporal");
+
+        size_t a_escribir = std::min(sub_N, restantes);
+        size_t escritos = 0;
+        
+        while (escritos < a_escribir) {
+            size_t cantidad = std::min(ELEMENTS_PER_BLOCK, a_escribir - escritos);
+            size_t posicion_inicial = (N - restantes + escritos);
+            
+            // Leer directamente los elementos (no por bloques completos)
+            fseek(input, posicion_inicial * sizeof(uint64_t), SEEK_SET);
+            fread(buffer.data(), sizeof(uint64_t), cantidad, input);
+            disk_access++;
+            
+            // Escribir los elementos
+            fseek(out, escritos * sizeof(uint64_t), SEEK_SET);
+            fwrite(buffer.data(), sizeof(uint64_t), cantidad, out);
+            disk_access++;
+            
+            escritos += cantidad;
         }
 
         fclose(out);
-        sub_paths.push_back(part_name);
+        partes.push_back(nombre);
+        restantes -= a_escribir;
     }
 
     fclose(input);
-
-    // Paso 2: ordeno recursivamente cada uno
-    std::vector<std::string> ordenados;
-    for (size_t i = 0; i < sub_paths.size(); ++i) {
-        std::string sorted = sub_paths[i] + "_sorted";
-        size_t real_N = std::min(sub_N, N - i * sub_N);
-        mergesort_externo(sub_paths[i], sorted, real_N);
-        ordenados.push_back(sorted);
-    }
-
-    // Paso 3: merge final
-    mergear_archivos(ordenados, output_path);
+    return partes;
 }
 
-// estructura para el heap
-struct EntradaHeap {
-    uint64_t valor;
-    size_t archivo;
-    bool operator>(const EntradaHeap& otro) const {
-        return valor > otro.valor;
-    }
-};
+std::string ExternalMergeSort::ordenar_subarr(const std::string& input_path, size_t N, int& disk_access) {
+    if (N * sizeof(uint64_t) <= M) {
+        std::vector<uint64_t> buffer(N);
+        FILE* input = fopen(input_path.c_str(), "rb");
+        if (!input) throw std::runtime_error("No se pudo abrir archivo para ordenar");
 
-void ExternalMergeSort::mergear_archivos(const std::vector<std::string>& files, const std::string& output) {
-    size_t k = files.size();
-    std::vector<FILE*> f_in(k);
-    std::vector<bool> terminado(k, false);
-    std::vector<uint64_t> actual(k);
+        // Leer todos los elementos de una vez
+        fread(buffer.data(), sizeof(uint64_t), N, input);
+        disk_access++;
+        fclose(input);
+
+        std::sort(buffer.begin(), buffer.end());
+
+        std::string salida = input_path + "_ordenado";
+        FILE* output = fopen(salida.c_str(), "wb");
+        if (!output) throw std::runtime_error("No se pudo crear archivo ordenado");
+
+        // Escribir todos los elementos de una vez
+        fwrite(buffer.data(), sizeof(uint64_t), N, output);
+        disk_access++;
+        fclose(output);
+
+        return salida;
+    }
+
+    std::string salida = input_path + "_ordenado";
+    mergesort_externo(input_path, salida, N, disk_access);
+    return salida;
+}
+
+void ExternalMergeSort::mergear_archivos(const std::vector<std::string>& archivos, const std::string& output, int& disk_access) {
+    size_t k = archivos.size();
+    std::vector<FILE*> fuentes(k);
+    std::vector<std::vector<uint64_t>> buffers(k, std::vector<uint64_t>(ELEMENTS_PER_BLOCK));
+    std::vector<size_t> indices(k, 0);
+    std::vector<size_t> sizes(k, 0);
+    std::vector<bool> activos(k, true);
+
+    // Abrir archivos y cargar los primeros bloques
+    for (size_t i = 0; i < k; ++i) {
+        fuentes[i] = fopen(archivos[i].c_str(), "rb");
+        if (!fuentes[i]) throw std::runtime_error("No se pudo abrir subarchivo");
+        sizes[i] = fread(buffers[i].data(), sizeof(uint64_t), ELEMENTS_PER_BLOCK, fuentes[i]);
+        disk_access++;
+    }
+
+    FILE* out = fopen(output.c_str(), "wb");
+    if (!out) throw std::runtime_error("No se pudo crear archivo de salida");
+
+    std::vector<uint64_t> buffer_out(ELEMENTS_PER_BLOCK);
+    size_t index_out = 0;
+
+    auto cmp = [&](size_t a, size_t b) {
+        return buffers[a][indices[a]] > buffers[b][indices[b]];
+    };
+    std::priority_queue<size_t, std::vector<size_t>, decltype(cmp)> heap(cmp);
 
     for (size_t i = 0; i < k; ++i) {
-        f_in[i] = fopen(files[i].c_str(), "rb");
-        if (!f_in[i]) throw std::runtime_error("Error abriendo archivo para merge");
-        if (fread(&actual[i], sizeof(uint64_t), 1, f_in[i]) != 1)
-            terminado[i] = true;
-    }
-
-    FILE* f_out = fopen(output.c_str(), "wb");
-    if (!f_out) throw std::runtime_error("No se pudo crear archivo de salida");
-
-    std::priority_queue<EntradaHeap, std::vector<EntradaHeap>, std::greater<>> heap;
-    for (size_t i = 0; i < k; ++i) {
-        if (!terminado[i]) {
-            heap.push({actual[i], i});
+        if (sizes[i] > 0) {
+            heap.push(i);
+        } else {
+            activos[i] = false;
+            fclose(fuentes[i]);
         }
     }
 
     while (!heap.empty()) {
-        EntradaHeap top = heap.top(); heap.pop();
-        fwrite(&top.valor, sizeof(uint64_t), 1, f_out);
+        size_t idx = heap.top(); heap.pop();
+        buffer_out[index_out++] = buffers[idx][indices[idx]++];
+        if (index_out == ELEMENTS_PER_BLOCK) {
+            fwrite(buffer_out.data(), sizeof(uint64_t), ELEMENTS_PER_BLOCK, out);
+            disk_access++;
+            index_out = 0;
+        }
 
-        if (fread(&actual[top.archivo], sizeof(uint64_t), 1, f_in[top.archivo]) == 1) {
-            heap.push({actual[top.archivo], top.archivo});
+        if (indices[idx] == sizes[idx]) {
+            sizes[idx] = fread(buffers[idx].data(), sizeof(uint64_t), ELEMENTS_PER_BLOCK, fuentes[idx]);
+            disk_access++;
+            indices[idx] = 0;
+            if (sizes[idx] == 0) {
+                activos[idx] = false;
+                fclose(fuentes[idx]);
+            } else {
+                heap.push(idx);
+            }
         } else {
-            fclose(f_in[top.archivo]);
-            terminado[top.archivo] = true;
+            heap.push(idx);
         }
     }
 
-    fclose(f_out);
+    if (index_out > 0) {
+        fwrite(buffer_out.data(), sizeof(uint64_t), index_out, out);
+        disk_access++;
+    }
+
+    fclose(out);
+}
+
+
+void ExternalMergeSort::mergesort_externo(const std::string& input_path, const std::string& output_path, size_t N, int& disk_access) {
+    if (N * sizeof(uint64_t) <= M) {
+        std::string ordenado = ordenar_subarr(input_path, N, disk_access);
+        std::rename(ordenado.c_str(), output_path.c_str());
+        return;
+    }
+
+    std::vector<std::string> partes = dividir_arr(input_path, N, disk_access);
+    std::vector<std::string> ordenadas;
+    size_t sub_N = (N + aridad - 1) / aridad;
+    size_t restantes = N;
+
+    for (const auto& nombre : partes) {
+        size_t tam = std::min(sub_N, restantes);
+        ordenadas.push_back(ordenar_subarr(nombre, tam, disk_access));
+        restantes -= tam;
+    }
+
+    mergear_archivos(ordenadas, output_path, disk_access);
+
+    for (const auto& archivo : partes) std::remove(archivo.c_str());
+    for (const auto& archivo : ordenadas) std::remove(archivo.c_str());
 }
