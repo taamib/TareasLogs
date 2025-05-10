@@ -97,7 +97,7 @@ int main() {
 
         for (const auto& nombre : partes) {
             size_t tam = std::min(sub_N, restantes);
-            std::string ordenado = sorter.ordenar_subarr(nombre, tam, disk_access);
+            std::string ordenado = sorter.ordenar_subarr(nombre, sub_N, disk_access);
             ordenadas.push_back(ordenado);
             restantes -= tam;
         }
