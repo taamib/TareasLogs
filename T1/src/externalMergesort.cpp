@@ -88,7 +88,7 @@ std::string ExternalMergeSort::ordenar_subarr(const std::string& input_path, siz
         size_t leidos = 0;
         size_t elementos_leer = std::min(ELEMENTS_PER_BLOCK, N - leidos);
 
-        std::vector<uint64_t> data;
+        std::vector<uint64_t> data; //
         data.reserve(N);
         std::vector<uint64_t> buffera(ELEMENTS_PER_BLOCK); // Buffer para almacenar todos los elementos del archivo
         while (leidos < N) {
