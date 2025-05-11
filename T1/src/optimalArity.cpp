@@ -23,33 +23,41 @@ public:
 
     // Función para calcular el número de elementos en el archivo binario
     static size_t calcular_num_elementos(const std::string& filepath) {
-        struct stat st;
-        if (stat(filepath.c_str(), &st) != 0) {
-            throw std::runtime_error("No se pudo obtener el tamaño del archivo");
+        std::ifstream file(filepath, std::ios::binary | std::ios::ate);
+        if (!file) {
+            throw std::runtime_error("No se pudo abrir el archivo: " + filepath);
         }
         
-        size_t file_size = st.st_size;
+        std::streamsize file_size = file.tellg();
+        file.close();
+        
+        if (file_size < 0) {
+            throw std::runtime_error("Error al obtener tamaño del archivo");
+        }
+        
         if (file_size % sizeof(uint64_t) != 0) {
-            throw std::runtime_error("Tamaño de archivo no coincide con tamaño de uint64_t");
+            throw std::runtime_error("Tamaño de archivo no es múltiplo de sizeof(uint64_t)");
         }
         
-        return file_size / sizeof(uint64_t);
+        return static_cast<size_t>(file_size) / sizeof(uint64_t);
     }
 
     static TestResult evaluate_aridad(const std::string& input_path, size_t N, int aridad) {
-        std::cout << "[Prueba] Evaluando aridad = " << aridad << std::endl;
+        int disk_access = 0; // Seteamos los I/Os a 0
+
+        std::cout << "[Prueba] Evaluando aridad = " << aridad << std::endl; // Printeamos qué aridad evaluaremos
         
-        int disk_access = 0;
-        auto start = std::chrono::high_resolution_clock::now();
+        auto start = std::chrono::high_resolution_clock::now(); // Guardamos hora de comienzo
 
-        ExternalMergeSort sorter(aridad);
-        sorter.mergesort_externo(input_path, input_path + "_temp_output", N, disk_access);
+        ExternalMergeSort sorter(aridad); // Instancia de merge sorter
+        sorter.mergesort_externo(input_path, input_path + "_temp_output", N, disk_access); // Usamos la función para ejecutar mergesort ecterno
 
-        auto end = std::chrono::high_resolution_clock::now();
-        double elapsed = std::chrono::duration<double>(end - start).count();
+        auto end = std::chrono::high_resolution_clock::now(); // Ya retornó la función asi que guardamos hora de finalización
+        double elapsed = std::chrono::duration<double>(end - start).count(); // Calculamos cuánto fue el tiempo total
 
-        std::remove((input_path + "_temp_output").c_str());
+        std::remove((input_path + "_temp_output").c_str()); // Borramos el archivo
 
+        // Retornamos en pantalla los resultados
         std::cout << "[Resultado] Aridad " << aridad 
                   << " - I/Os: " << disk_access 
                   << " - Tiempo: " << elapsed << "s\n";

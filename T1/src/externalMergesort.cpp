@@ -11,7 +11,6 @@
 const size_t M = 50 * 1024 * 1024; // 
 const size_t B = 4096;
 const size_t ELEMENTS_PER_BLOCK = B / sizeof(uint64_t);
-const int aridad = 3;
 
 /** Divide un arreglo en a subarreglos del mismo tamaño
 * Sus parámetros son:
@@ -24,7 +23,7 @@ std::vector<std::string> ExternalMergeSort::dividir_arr(const std::string& input
     FILE* file = fopen(input_path.c_str(), "rb");
     if (!file) throw std::runtime_error("No se pudo abrir el archivo original");
     
-    std::vector<uint64_t> buffer(ELEMENTS_PER_BLOCK);
+    std::vector<uint64_t> buffer(ELEMENTS_PER_BLOCK); // Creamos buffer de tamaño B 
     size_t elements_per_part = (N + aridad - 1) / aridad;
 
     for (int i = 0; i < aridad && N > 0; ++i) {
@@ -36,22 +35,21 @@ std::vector<std::string> ExternalMergeSort::dividir_arr(const std::string& input
         }
 
         size_t to_write = std::min(elements_per_part, N);
+
+        std::vector<uint64_t> temp_buffer;
+        temp_buffer.reserve(elements_per_part); // Reservar espacio para toda la partición
         size_t written = 0;
 
         while (written < to_write) {
             size_t to_read = std::min(ELEMENTS_PER_BLOCK, to_write - written);
-            size_t read = fread(buffer.data(), sizeof(uint64_t), to_read, file);
-            if (read != to_read) {
-                fclose(file);
-                fclose(out);
-                throw std::runtime_error("Error de lectura al dividir");
-            }
+            fread(buffer.data(), sizeof(uint64_t), to_read, file);
             disk_access++;
 
-            fwrite(buffer.data(), sizeof(uint64_t), read, out);
-            disk_access++;
-            written += read;
+            temp_buffer.insert(temp_buffer.end(), buffer.begin(), buffer.begin() + to_read);
+            written += to_read;
         }
+        fwrite(temp_buffer.data(), sizeof(uint64_t), temp_buffer.size(), out);
+        disk_access++;
 
         fclose(out);
         partes.push_back(part_name);
@@ -81,14 +79,11 @@ std::string ExternalMergeSort::ordenar_subarr(const std::string& input_path, siz
         size_t remaining = N;
         while (remaining > 0) {
             size_t to_read = std::min(ELEMENTS_PER_BLOCK, remaining);
-            fread(buffer.data(), sizeof(uint64_t), to_read, input);
+            fread(data.data() + (N - remaining), sizeof(uint64_t), to_read, input);
             disk_access++;
-            
-            for (size_t i = 0; i < to_read; ++i) {
-                data.push_back(buffer[i]);
-            }
             remaining -= to_read;
         }
+        
         fclose(input);
 
         std::sort(data.begin(), data.end());

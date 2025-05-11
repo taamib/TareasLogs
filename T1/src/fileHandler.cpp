@@ -23,7 +23,6 @@ void FileHandler::read_block(FILE* file, const size_t block_number, void* buffer
 }
 
 
-
 void FileHandler::write_block(FILE* file, const size_t block_number, const void* buffer, const size_t B) {
 
     // Implementar: fseek + fwrite
