@@ -20,9 +20,8 @@ public:
     static void array_to_block(const uint64_t* array, void* block, size_t elements);
 
     // Calcular elementos por bloque (B debe ser múltiplo de 8)
-    static constexpr size_t elements_per_block(size_t B) {
-        assert(B % sizeof(uint64_t) == 0 && "B debe ser múltiplo de 8");
-        return B / sizeof(uint64_t);
+    static constexpr size_t elements_per_block(size_t block_size) {
+        return block_size / sizeof(uint64_t);
     }
 };
 
