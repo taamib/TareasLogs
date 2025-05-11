@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <queue>
 
+
 const size_t M = 50 * 1024 * 1024; // 
 const size_t B = 4096;
 const size_t ELEMENTS_PER_BLOCK = B / sizeof(uint64_t);
