@@ -3,9 +3,9 @@
 #include "../hpps/externalMergesort.hpp" // Incluye tu implementación
 
 const size_t M = 50 * 1024 * 1024;
-const size_t N = 60*M;
+const size_t N = 4*M;
 void probarMergesort(const std::string& inputPath) {
-    ExternalMergeSort sorter(80); // Instancia de la clase
+    ExternalMergeSort sorter(360); // Instancia de la clase
     int diskAccess = 0;       // Contador de accesos a disco
 
     // Calcular número de elementos en el archivo
