@@ -23,6 +23,7 @@ public:
 
     // Función para calcular el número de elementos en el archivo binario
     static size_t calcular_num_elementos(const std::string& filepath) {
+<<<<<<< HEAD
         std::ifstream file(filepath, std::ios::binary | std::ios::ate);
         if (!file) {
             throw std::runtime_error("No se pudo abrir el archivo: " + filepath);
@@ -58,6 +59,35 @@ public:
         std::remove((input_path + "_temp_output").c_str()); // Borramos el archivo
 
         // Retornamos en pantalla los resultados
+=======
+        struct stat st;
+        if (stat(filepath.c_str(), &st) != 0) {
+            throw std::runtime_error("No se pudo obtener el tamaño del archivo");
+        }
+        
+        size_t file_size = st.st_size;
+        if (file_size % sizeof(uint64_t) != 0) {
+            throw std::runtime_error("Tamaño de archivo no coincide con tamaño de uint64_t");
+        }
+        
+        return file_size / sizeof(uint64_t);
+    }
+
+    static TestResult evaluate_aridad(const std::string& input_path, size_t N, int aridad) {
+        std::cout << "[Prueba] Evaluando aridad = " << aridad << std::endl;
+        
+        int disk_access = 0;
+        auto start = std::chrono::high_resolution_clock::now();
+
+        ExternalMergeSort sorter(aridad);
+        sorter.mergesort_externo(input_path, input_path + "_temp_output", N, disk_access);
+
+        auto end = std::chrono::high_resolution_clock::now();
+        double elapsed = std::chrono::duration<double>(end - start).count();
+
+        std::remove((input_path + "_temp_output").c_str());
+
+>>>>>>> 66a16f5437f36f809cb9870e9c9635d002c2448c
         std::cout << "[Resultado] Aridad " << aridad 
                   << " - I/Os: " << disk_access 
                   << " - Tiempo: " << elapsed << "s\n";

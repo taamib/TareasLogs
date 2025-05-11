@@ -17,5 +17,9 @@ public:
     const size_t ELEMENTS_PER_BLOCK = B / sizeof(uint64_t);
     const size_t buffersize = ELEMENTS_PER_BLOCK*4;
 private:
+<<<<<<< HEAD
     int aridad = 360;
+=======
+    int aridad = 80;
+>>>>>>> 66a16f5437f36f809cb9870e9c9635d002c2448c
 };

@@ -11,6 +11,7 @@
 const size_t M = 50 * 1024 * 1024; // 
 const size_t B = 4096;
 const size_t ELEMENTS_PER_BLOCK = B / sizeof(uint64_t);
+const int aridad = 3;
 
 /** Divide un arreglo en a subarreglos del mismo tamaño
 * Sus parámetros son:
@@ -87,7 +88,6 @@ std::string ExternalMergeSort::ordenar_subarr(const std::string& input_path, siz
         fclose(input);
 
         std::sort(data.begin(), data.end());
-
         std::string output_name = input_path + "_ordenado";
         FILE* output = fopen(output_name.c_str(), "wb");
         if (!output) throw std::runtime_error("No se pudo crear archivo ordenado");
